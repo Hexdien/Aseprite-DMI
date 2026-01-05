@@ -1,0 +1,22 @@
+
+
+
+--------- Como usar AsepriteDMI
+
+Passo 1 - Utilizar o Re-ordenador dream maker criado por mim
+
+Primeiro você precisa utilizar a ferramenta para reordenar os States do icon.
+
+Para utilizar ela, bastar compilar e rodar pelo dream maker, clicar em Reordenar DMI, escolhe o icon que precisa ser re-ordenado, então escolhe o local de saída do resultado.
+
+No fim você terá um icon com os states ordenados pronto para usar a ferramenta AsepriteDMI
+
+
+
+
+Passo 2 - Utilizar o AsepriteDMI na função importar
+
+Você deve escolhe o tamanho do canvas que o icon foi criado, por exemplo 32x32, 64x64....
+
+em seguida, irá gerar 4 camadas.
+Cada camada terá todos os frames em sequencias corretas separados por direção.
