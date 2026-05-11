@@ -33,6 +33,22 @@ It is especially useful for character animations where frames are separated by d
 5. For Export, select the layers or groups for each direction and set the total number of columns for the sheet.  
 6. AsepriteDmi will handle the layout automatically.
 
+### 🏷️ Tag-based Export
+Export can use Aseprite tags to mix regular 4-direction animations with 1-direction animations in the same sheet.
+
+- Normal tags are exported as 4 directions: `South, North, East, West` for every frame.
+- Add `[1]`, `[1dir]`, or `dirs=1` to a tag name to export that tag as 1 direction.
+- For 1-direction tags, the source layer is `South` by default.
+- To pick the source layer per frame, add an order after `[1:]`.
+
+Example:
+
+```text
+walk                 -> 4 directions
+meditate [1]         -> 1 direction, using South layer
+spin kick [1:S,E,N,W] -> 1 direction, frames pulled from South, East, North, West layers
+```
+
 ### ❤️ Support
 If you want to support the project, you can donate here:  
 - [PayPal](https://paypal.me/hexdien)  
@@ -67,6 +83,22 @@ O **AsepriteDmi** é um script para Aseprite que ajuda a organizar e gerar sprit
    - **Importar** → Lê um sprite sheet e distribui os frames em camadas separadas por direção.  
 5. Para Exportar, selecione as layers ou grupos correspondentes a cada direção e defina o número total de colunas da folha.  
 6. O AsepriteDmi fará a organização automática dos frames.
+
+### 🏷️ Exportação por Tags
+O export pode usar tags do Aseprite para misturar animações normais de 4 direções com animações de 1 direção na mesma folha.
+
+- Tags normais são exportadas como 4 direções: `Sul, Norte, Leste, Oeste` para cada frame.
+- Adicione `[1]`, `[1dir]` ou `dirs=1` no nome da tag para exportar aquela tag como 1 direção.
+- Em tags de 1 direção, a layer usada por padrão é `Sul`.
+- Para escolher a layer usada em cada frame, coloque a ordem depois de `[1:]`.
+
+Exemplo:
+
+```text
+andando                         -> 4 direções
+meditar [1]                     -> 1 direção, usando a layer Sul
+chute giratorio [1:S,L,N,O]     -> 1 direção, frames puxados das layers Sul, Leste, Norte, Oeste
+```
 
 ### ❤️ Apoie o Projeto
 Se você quiser apoiar o projeto, pode fazer uma doação:  
