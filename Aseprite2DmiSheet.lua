@@ -76,6 +76,100 @@ local function composeLayers(layerList, frameIndex, w, h, colorMode)
 	return buffer
 end
 
+local DIR_NAMES = { "Sul", "Norte", "Leste", "Oeste" }
+local DIR_OFFSETS = { Sul = 0, Norte = 1, Leste = 2, Oeste = 3 }
+
+local DIR_ALIASES = {
+	s = "Sul",
+	sul = "Sul",
+	south = "Sul",
+	baixo = "Sul",
+	n = "Norte",
+	norte = "Norte",
+	north = "Norte",
+	cima = "Norte",
+	l = "Leste",
+	le = "Leste",
+	leste = "Leste",
+	e = "Leste",
+	east = "Leste",
+	direita = "Leste",
+	o = "Oeste",
+	oe = "Oeste",
+	oeste = "Oeste",
+	w = "Oeste",
+	west = "Oeste",
+	esquerda = "Oeste",
+}
+
+local function trim(text)
+	return (text:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+local function normalizeDirName(text)
+	local key = trim(text):lower()
+	return DIR_ALIASES[key]
+end
+
+local function frameNumber(frame)
+	if type(frame) == "number" then
+		return frame
+	end
+	return frame.frameNumber
+end
+
+local function sortedTags(sprite)
+	local tags = {}
+	for _, tag in ipairs(sprite.tags) do
+		table.insert(tags, tag)
+	end
+	table.sort(tags, function(a, b)
+		return frameNumber(a.fromFrame) < frameNumber(b.fromFrame)
+	end)
+	return tags
+end
+
+--- Lê convenções simples no nome da tag para decidir o layout de exportação.
+---
+--- Padrão:
+---   "andar"                       -> 4 direções
+---   "meditar [1]"                 -> 1 direção, sempre usando a layer Sul
+---   "chute giratorio dirs=1"      -> 1 direção, sempre usando a layer Sul
+---   "chute [1:Sul,Leste,Norte,Oeste]"
+---                                  -> 1 direção, escolhendo a layer por frame
+local function parseTagExportConfig(tagName)
+	local lower = tagName:lower()
+	local config = { dirCount = 4, sourceDirs = nil, invalidDirs = {} }
+
+	local orderSpec = tagName:match("%[1%s*:%s*([^%]]+)%]")
+		or tagName:match("%[1dir%s*:%s*([^%]]+)%]")
+		or tagName:match("%[dirs%s*=%s*1%s*:%s*([^%]]+)%]")
+
+	if orderSpec
+		or lower:find("%[1%]")
+		or lower:find("%[1dir%]")
+		or lower:find("dirs%s*=%s*1")
+		or lower:find("dir%s*=%s*1")
+		or lower:find("1%s*dir")
+	then
+		config.dirCount = 1
+	end
+
+	if orderSpec then
+		config.sourceDirs = {}
+		for token in orderSpec:gmatch("[^,%s]+") do
+			local dir = normalizeDirName(token)
+			if dir then
+				table.insert(config.sourceDirs, dir)
+			else
+				table.insert(config.invalidDirs, token)
+			end
+		end
+	end
+
+	return config
+end
+
 -- =============================================================================
 -- UTILITÁRIOS DE LAYERS
 -- =============================================================================
@@ -159,6 +253,12 @@ local function showExportDialog()
 
 	-- Número de colunas da folha gerada (padrão BYOND é 17 para ícones 32x32).
 	dlg:number({ id = "columns", label = "Colunas:", text = "17" })
+	dlg:check({
+		id = "useTags",
+		label = "Exportar por tags:",
+		text = "Usar tags para misturar 4 dirs e 1 dir",
+		selected = #spr.tags > 0,
+	})
 	dlg:button({ id = "ok", text = "Exportar", focus = true })
 	dlg:button({ id = "cancel", text = "Cancelar" })
 	dlg:show()
@@ -173,7 +273,7 @@ local function showExportDialog()
 	-- -------------------------------------------------------------------------
 	-- dirOffsets: posição relativa de cada direção dentro de um grupo de 4 tiles.
 	-- No formato BYOND a ordem é sempre S=0, N=1, L=2, O=3.
-	local dirOffsets = { Sul = 0, Norte = 1, Leste = 2, Oeste = 3 }
+	local dirOffsets = DIR_OFFSETS
 
 	-- Para cada direção, expande o nó selecionado até as layers de imagem folha.
 	local selectedLayers = {
@@ -195,11 +295,64 @@ local function showExportDialog()
 
 	local w, h = spr.width, spr.height
 	local jump = 4 -- Número de slots entre o mesmo frame em direções diferentes.
+	local useTags = data.useTags == true
 
-	-- O índice do último tile é: offset_Oeste + (último frame) * jump
-	-- Isso garante que a folha tenha linhas suficientes para todos os tiles.
-	local lastIndex = dirOffsets["Oeste"] + (frameCount - 1) * jump
-	local totalRows = math.floor(lastIndex / totalCols) + 1
+	local exportTiles = {}
+
+	if useTags then
+		local tags = sortedTags(spr)
+		if #tags == 0 then
+			return app.alert("Exportação por tags ativada, mas o sprite não possui tags.")
+		end
+
+		for _, tag in ipairs(tags) do
+			local config = parseTagExportConfig(tag.name)
+			local fromFrame = frameNumber(tag.fromFrame)
+			local toFrame = frameNumber(tag.toFrame)
+
+			if #config.invalidDirs > 0 then
+				return app.alert(
+					"Tag com direção inválida: "
+						.. tag.name
+						.. "\nUse S, N, L, O ou Sul, Norte, Leste, Oeste."
+				)
+			end
+
+			if fromFrame > toFrame then
+				fromFrame, toFrame = toFrame, fromFrame
+			end
+
+			if config.dirCount == 1 then
+				for f = fromFrame, toFrame do
+					local dir = "Sul"
+					if config.sourceDirs and #config.sourceDirs > 0 then
+						local index = ((f - fromFrame) % #config.sourceDirs) + 1
+						dir = config.sourceDirs[index]
+					end
+					table.insert(exportTiles, { dir = dir, frame = f })
+				end
+			else
+				for f = fromFrame, toFrame do
+					for _, dir in ipairs(DIR_NAMES) do
+						table.insert(exportTiles, { dir = dir, frame = f })
+					end
+				end
+			end
+		end
+	else
+		-- Modo legado: todos os frames são exportados como 4 direções BYOND.
+		for f = 1, frameCount do
+			for _, dir in ipairs(DIR_NAMES) do
+				table.insert(exportTiles, { dir = dir, frame = f })
+			end
+		end
+	end
+
+	if #exportTiles == 0 then
+		return app.alert("Nenhum tile foi gerado para exportação.")
+	end
+
+	local totalRows = math.floor((#exportTiles - 1) / totalCols) + 1
 
 	-- Cria a imagem da folha final com as dimensões calculadas.
 	local sheet = Image(w * totalCols, h * totalRows, spr.colorMode)
@@ -208,28 +361,27 @@ local function showExportDialog()
 	-- -------------------------------------------------------------------------
 	-- Passo 5: Preenche a folha tile a tile.
 	-- -------------------------------------------------------------------------
-	-- Para cada direção, para cada frame:
-	--   posIndex = offset_da_direção + (frame - 1) * jump
-	--   col      = posIndex % totalCols   (coluna dentro da linha)
-	--   row      = posIndex // totalCols  (linha da folha)
-	--   dx, dy   = coordenadas em pixels do canto superior esquerdo do tile
-	for dir, layerList in pairs(selectedLayers) do
-		local baseOffset = dirOffsets[dir]
-
-		for f = 1, frameCount do
-			local posIndex = baseOffset + (f - 1) * jump
-			local col = posIndex % totalCols
-			local row = math.floor(posIndex / totalCols)
-
-			local dx = col * w
-			local dy = row * h
-
-			-- Compõe todas as layers deste frame em um buffer único.
-			local tileImg = composeLayers(layerList, f, w, h, spr.colorMode)
-
-			-- Cola o buffer na posição correta da folha.
-			sheet:drawImage(tileImg, Point(dx, dy))
+	-- No modo por tags, exportTiles já está na ordem exata da folha.
+	-- No modo legado, mantemos a fórmula antiga de offset por direção.
+	for i, tile in ipairs(exportTiles) do
+		local posIndex
+		if useTags then
+			posIndex = i - 1
+		else
+			posIndex = dirOffsets[tile.dir] + (tile.frame - 1) * jump
 		end
+
+		local col = posIndex % totalCols
+		local row = math.floor(posIndex / totalCols)
+
+		local dx = col * w
+		local dy = row * h
+
+		-- Compõe todas as layers deste frame em um buffer único.
+		local tileImg = composeLayers(selectedLayers[tile.dir], tile.frame, w, h, spr.colorMode)
+
+		-- Cola o buffer na posição correta da folha.
+		sheet:drawImage(tileImg, Point(dx, dy))
 	end
 
 	-- -------------------------------------------------------------------------
