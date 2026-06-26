@@ -694,6 +694,7 @@ local function showExportDialog()
 
 	local totalCols = math.max(1, tonumber(data.columns) or 17)
 	local frameCount = #spr.frames
+
 	if frameCount == 0 then
 		return app.alert("Sprite não possui frames.")
 	end
@@ -813,6 +814,9 @@ local function importByondSheet()
 		return
 	end
 
+	-- -------------------------------------------------------------------------
+	-- Passo 3: Valida as dimensões informadas.
+	-- -------------------------------------------------------------------------
 	local fw = tonumber(dlg.data.fw)
 	local fh = tonumber(dlg.data.fh)
 	if not fw or not fh or fw <= 0 or fh <= 0 then
@@ -859,6 +863,8 @@ local function importByondSheet()
 	local dirNames = (dirCount == 1) and { "Sul" } or { "Sul", "Norte", "Leste", "Oeste" }
 
 	local newSpr = Sprite(fw, fh, spr.colorMode)
+
+	-- O sprite começa com 1 frame; adiciona os demais até chegar em framesCount.
 	while #newSpr.frames < framesCount do
 		newSpr:newFrame()
 	end
@@ -898,6 +904,9 @@ local function importByondSheet()
 		end
 	end
 
+	-- -------------------------------------------------------------------------
+	-- Passo 9: Finaliza e exibe o resultado.
+	-- -------------------------------------------------------------------------
 	app.activeSprite = newSpr
 	app.refresh()
 	app.alert("Importação concluída!\n" .. framesCount .. " frame(s) × " .. dirCount .. " direção(ões).")
@@ -1700,6 +1709,7 @@ local function showMainDialog()
 	if dlg.data.debug ~= nil then
 		debugMode = dlg.data.debug
 	end
+	-- Se "cancel" ou fechou o diálogo, simplesmente termina.
 end
 
 -- =============================================================================
