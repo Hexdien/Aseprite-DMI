@@ -20,3 +20,32 @@ Você deve escolhe o tamanho do canvas que o icon foi criado, por exemplo 32x32,
 
 em seguida, irá gerar 4 camadas.
 Cada camada terá todos os frames em sequencias corretas separados por direção.
+
+
+
+--------- Exportação por tags
+
+Na função exportar, você pode ativar "Exportar por tags" para que o script leia
+as tags do Aseprite em ordem.
+
+Tags comuns são exportadas como animações de 4 direções:
+Sul, Norte, Leste, Oeste para cada frame.
+
+Para marcar uma tag como animação de 1 direção, use no nome:
+
+meditar [1]
+meditar [1dir]
+meditar dirs=1
+
+Nesses casos, o script usa a layer Sul para todos os frames da tag.
+
+Para animações de 1 direção que usam desenhos vindos de layers diferentes,
+informe a ordem dentro da tag:
+
+chute giratorio [1:S,L,N,O]
+
+Esse exemplo exporta 4 frames em sequência usando:
+frame 1 da layer Sul,
+frame 2 da layer Leste,
+frame 3 da layer Norte,
+frame 4 da layer Oeste.
