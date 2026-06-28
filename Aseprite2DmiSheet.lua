@@ -570,18 +570,25 @@ local function sortedTags(sprite)
 	return tags
 end
 
---- Lê convenções no nome da tag para decidir o layout de exportação.
+--- Interpreta as convenções de layout a partir de um texto (nome da tag OU
+--- User Data). Reconhece os mesmos marcadores em qualquer um dos dois:
 ---   "andar"                  -> 4 direções
 ---   "meditar [1]"            -> 1 direção, sempre layer Sul
 ---   "chute dirs=1"           -> 1 direção, sempre layer Sul
 ---   "chute [1:Sul,Leste,...]"-> 1 direção, escolhendo a layer por frame
-local function parseTagExportConfig(tagName)
-	local lower = tagName:lower()
-	local config = { dirCount = 4, sourceDirs = nil, invalidDirs = {} }
+--- `config.found` indica se algum marcador de 1 direção foi encontrado no texto
+--- (4 direções é o padrão e não exige marcador, por isso não conta como setup).
+local function parseExportConfigFromText(text)
+	local config = { dirCount = 4, sourceDirs = nil, invalidDirs = {}, found = false }
+	if not text or text == "" then
+		return config
+	end
 
-	local orderSpec = tagName:match("%[1%s*:%s*([^%]]+)%]")
-		or tagName:match("%[1dir%s*:%s*([^%]]+)%]")
-		or tagName:match("%[dirs%s*=%s*1%s*:%s*([^%]]+)%]")
+	local lower = text:lower()
+
+	local orderSpec = text:match("%[1%s*:%s*([^%]]+)%]")
+		or text:match("%[1dir%s*:%s*([^%]]+)%]")
+		or text:match("%[dirs%s*=%s*1%s*:%s*([^%]]+)%]")
 
 	if
 		orderSpec
@@ -592,6 +599,7 @@ local function parseTagExportConfig(tagName)
 		or lower:find("1%s*dir")
 	then
 		config.dirCount = 1
+		config.found = true
 	end
 
 	if orderSpec then
@@ -604,6 +612,32 @@ local function parseTagExportConfig(tagName)
 				table.insert(config.invalidDirs, token)
 			end
 		end
+	end
+
+	return config
+end
+
+--- Decide o layout de exportação de uma tag. Tenta primeiro o NOME da tag; se
+--- nenhum setup de direção for encontrado lá, recorre ao User Data da tag
+--- (`tag.data`). Isso permite manter o nome curto (ex.: "R") e guardar o setup
+--- longo no User Data (ex.: "Rest\n[1]").
+--- Aceita um objeto Tag do Aseprite ou, por compatibilidade, uma string (nome).
+local function parseTagExportConfig(tag)
+	local name, userData
+	if type(tag) == "string" then
+		name = tag
+	else
+		name = tag.name or ""
+		userData = tag.data -- User Data da tag (pode ser nil ou "")
+	end
+
+	local config = parseExportConfigFromText(name)
+	if config.found then
+		return config
+	end
+
+	if userData and userData ~= "" then
+		return parseExportConfigFromText(userData)
 	end
 
 	return config
@@ -710,7 +744,7 @@ local function showExportDialog()
 		end
 
 		for _, tag in ipairs(tags) do
-			local config = parseTagExportConfig(tag.name)
+			local config = parseTagExportConfig(tag)
 			local fromFrame = frameNumber(tag.fromFrame)
 			local toFrame = frameNumber(tag.toFrame)
 
@@ -1438,7 +1472,7 @@ local function importDmiIntoTags()
 				skipped[#skipped + 1] = (s.name == "" and "(sem nome)" or s.name)
 			else
 				local fromFrame = math.min(frameNumber(tag.fromFrame), frameNumber(tag.toFrame))
-				local config = parseTagExportConfig(tag.name)
+				local config = parseTagExportConfig(tag)
 				for fi = 0, s.frames - 1 do
 					if s.dirs >= 4 then
 						for d = 0, 3 do
